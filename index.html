@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISP Billing System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root { --bg: #f8fafc; --sidebar: #0f172a; --accent: #6366f1; --card: #ffffff; --text: #1e293b; }
+        * { box-sizing: border-box; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+        body { background: var(--bg); display: flex; min-height: 100vh; color: var(--text); }
+
+        /* Sidebar */
+        .sidebar { width: 240px; background: var(--sidebar); color: white; padding: 25px 15px; position: fixed; height: 100%; z-index: 100; }
+        .sidebar h1 { font-size: 22px; margin-bottom: 35px; color: #fff; display: flex; align-items: center; gap: 10px; font-weight: 800; }
+        .nav-item { padding: 12px 18px; margin-bottom: 8px; cursor: pointer; border-radius: 10px; transition: 0.3s; display: flex; align-items: center; gap: 12px; color: #94a3b8; }
+        .nav-item:hover, .nav-item.active { background: #1e293b; color: #fff; border-left: 4px solid var(--accent); }
+
+        /* Content */
+        .main-content { margin-left: 240px; flex: 1; padding: 35px; width: calc(100% - 240px); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        #installApp { background: #000; color: white; padding: 10px 20px; border-radius: 50px; border: none; cursor: pointer; display: none; align-items: center; gap: 8px; font-weight: 600; }
+
+        /* Dashboard */
+        .dash-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { padding: 8px 16px; border-radius: 20px; border: none; background: #e2e8f0; cursor: pointer; font-weight: 600; }
+        .tab-btn.active { background: var(--accent); color: white; }
+
+        .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-top: 4px solid var(--accent); }
+        .stat-card h3 { font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 8px; }
+        .stat-card p { font-size: 18px; font-weight: 800; }
+
+        /* Form */
+        .section { display: none; }
+        .section.active { display: block; }
+        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        input, select, textarea { padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; width: 100%; font-size: 14px; background: #f8fafc; outline: none; }
+        input:focus { border-color: var(--accent); background: #fff; }
+        
+        /* Save Button & Sync Label */
+        .save-area { position: relative; margin-top: 25px; }
+        button.primary { background: var(--accent); color: white; padding: 16px; width: 100%; border: none; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 15px; }
+        #syncLabel { display: none; text-align: center; color: #10b981; font-weight: 600; margin-top: 10px; font-size: 14px; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background: #f8fafc; padding: 15px; text-align: left; border-bottom: 2px solid #f1f5f9; color: #64748b; font-size: 12px; }
+        td { padding: 15px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+        .btn-sm { width: 32px; height: 32px; border: none; border-radius: 8px; cursor: pointer; color: white; margin-right: 4px; }
+        .btn-edit { background: #f59e0b; } .btn-print { background: #10b981; } .btn-del { background: #ef4444; }
+
+        @media (max-width: 768px) {
+            .sidebar { width: 60px; padding: 10px; }
+            .sidebar h1, .nav-item span { display: none; }
+            .main-content { margin-left: 60px; width: calc(100% - 60px); }
+            .form-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h1><i class="fas fa-file-invoice-dollar"></i> <span>Billing</span></h1>
+        <div class="nav-item active" onclick="showSection('dashboard', this)"><i class="fas fa-chart-line"></i> <span>Dashboard</span></div>
+        <div class="nav-item" onclick="showSection('new-entry', this)"><i class="fas fa-plus-circle"></i> <span>New Billing</span></div>
+        <div class="nav-item" onclick="showSection('database', this)"><i class="fas fa-database"></i> <span>Customer DB</span></div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h2 id="section-title">Overview</h2>
+            <button id="installApp"><i class="fab fa-android"></i> Install App</button>
+        </div>
+
+        <div id="dashboard" class="section active">
+            <div class="dash-tabs">
+                <button class="tab-btn active" onclick="setChart('daily', this)">Daily</button>
+                <button class="tab-btn" onclick="setChart('monthly', this)">Monthly</button>
+                <button class="tab-btn" onclick="setChart('quarterly', this)">Quarterly</button>
+            </div>
+            <div class="grid-stats">
+                <div class="stat-card"><h3>Cash</h3><p id="sCash">0 Ks</p></div>
+                <div class="stat-card"><h3>KPay</h3><p id="sKPay">0 Ks</p></div>
+                <div class="stat-card"><h3>MMQR</h3><p id="sMMQR">0 Ks</p></div>
+                <div class="stat-card"><h3>Total</h3><p id="sTotal">0 Ks</p></div>
+                <div class="stat-card"><h3>Users</h3><p id="sUsers">0</p></div>
+            </div>
+            <div class="card" style="height: 350px;"><canvas id="mainChart"></canvas></div>
+        </div>
+
+        <div id="new-entry" class="section">
+            <div class="card">
+                <form id="billingForm">
+                    <input type="hidden" id="editIndex" value="-1">
+                    <div class="form-grid">
+                        <div><label>Date</label><input type="date" id="date"></div>
+                        <div><label>Invoice Number</label><input type="text" id="invoice" placeholder="Type Invoice No. (e.g. 001)"></div>
+                        <input type="text" id="side" placeholder="Side ID (e.g. TME-01)">
+                        <input type="text" id="name" placeholder="Customer Name">
+                        <select id="plan">
+                            <option>15 Mbps</option><option>25 Mbps</option><option>35 Mbps</option><option>50 Mbps</option>
+                        </select>
+                        <input type="text" id="month" placeholder="Billing Month">
+                        <select id="payment" onchange="toggleTime()">
+                            <option value="Cash">Cash</option><option value="KPay">KPay</option><option value="MMQR">MMQR</option>
+                        </select>
+                        <div id="timeField" style="display:none;"><input type="text" id="payTime" placeholder="Time (e.g. 10:30 AM)"></div>
+                        <input type="number" id="amount" placeholder="Amount (Ks)">
+                        <textarea id="remark" placeholder="Notes" style="grid-column: span 2;"></textarea>
+                    </div>
+                    <div class="save-area">
+                        <button type="button" class="primary" onclick="handleSave()" id="saveBtn">Save Record</button>
+                        <div id="syncLabel"><i class="fas fa-check-circle"></i> Data Synced ✅</div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="database" class="section">
+            <div class="card">
+                <input type="text" id="search" placeholder="Search by name or ID..." onkeyup="renderDB()" style="margin-bottom:15px">
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>Date</th><th>Side</th><th>Customer</th><th>Amount</th><th>Pay</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody id="dbBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz_6EroHfJm6AtRDFpIFSmKvZkImh4AknRxxLReGfehcgAD0MEESlzOgL2kuqNEk9cv4w/exec";
+    let records = JSON.parse(localStorage.getItem('isp_data_v4')) || [];
+    let myChart;
+    let chartMode = 'daily';
+
+    function showSection(id, el) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        el.classList.add('active');
+        if(id === 'dashboard') updateDashboard();
+        if(id === 'new-entry' && document.getElementById('editIndex').value === "-1") resetForm();
+    }
+
+    function toggleTime() {
+        const val = document.getElementById('payment').value;
+        document.getElementById('timeField').style.display = (val !== 'Cash') ? 'block' : 'none';
+    }
+
+    function handleSave() {
+        const idx = document.getElementById('editIndex').value;
+        const data = {
+            date: document.getElementById('date').value,
+            invoice: document.getElementById('invoice').value,
+            side: document.getElementById('side').value,
+            name: document.getElementById('name').value,
+            plan: document.getElementById('plan').value,
+            month: document.getElementById('month').value,
+            payment: document.getElementById('payment').value,
+            payTime: document.getElementById('payTime').value || '',
+            amount: parseFloat(document.getElementById('amount').value) || 0,
+            remark: document.getElementById('remark').value
+        };
+
+        if(!data.name || !data.amount || !data.invoice) return alert("Fill Name, Invoice and Amount!");
+
+        if(idx === "-1") {
+            records.push(data);
+            fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
+        } else {
+            records[idx] = data;
+        }
+
+        localStorage.setItem('isp_data_v4', JSON.stringify(records));
+        
+        const label = document.getElementById('syncLabel');
+        label.style.display = 'block';
+        setTimeout(() => { 
+            label.style.display = 'none'; 
+            showSection('database', document.querySelectorAll('.nav-item')[2]); 
+        }, 800);
+        
+        initApp();
+    }
+
+    function printReceipt(i) {
+        const r = records[i];
+        const w = window.open('', '', 'width=400,height=600');
+        w.document.write(`
+            <html><body style="font-family:sans-serif; padding:30px; color:#333;">
+                <div style="text-align:center; border-bottom:2px solid #333; padding-bottom:10px; margin-bottom:20px;">
+                    <h2 style="margin:0; text-transform:uppercase; letter-spacing:2px;">Billing Receipt</h2>
+                    <small>ISP Internet Service</small>
+                </div>
+                <table style="width:100%; font-size:14px; line-height:2;">
+                    <tr><td>Invoice:</td><td align="right"><b>${r.invoice}</b></td></tr>
+                    <tr><td>Date:</td><td align="right">${r.date}</td></tr>
+                    <tr><td>Customer:</td><td align="right"><b>${r.name}</b></td></tr>
+                    <tr><td>Side ID:</td><td align="right">${r.side}</td></tr>
+                    <tr><td>Plan:</td><td align="right">${r.plan}</td></tr>
+                    <tr><td>Month:</td><td align="right">${r.month}</td></tr>
+                    <tr><td>Method:</td><td align="right">${r.payment} ${r.payTime}</td></tr>
+                </table>
+                <div style="background:#f1f5f9; padding:15px; border-radius:10px; text-align:center; margin-top:20px;">
+                    <small>Total Amount</small><br><b style="font-size:20px;">${r.amount.toLocaleString()} Ks</b>
+                </div>
+                <p style="text-align:center; font-size:11px; color:#999; margin-top:40px;">*** Thank You For Your Payment ***</p>
+                <script>window.onload=()=>{window.print();window.close();}<\/script>
+            </body></html>
+        `);
+    }
+
+    function editRecord(i) {
+        const r = records[i];
+        document.getElementById('editIndex').value = i;
+        document.getElementById('date').value = r.date;
+        document.getElementById('invoice').value = r.invoice;
+        document.getElementById('side').value = r.side;
+        document.getElementById('name').value = r.name;
+        document.getElementById('plan').value = r.plan;
+        document.getElementById('month').value = r.month;
+        document.getElementById('payment').value = r.payment;
+        document.getElementById('payTime').value = r.payTime;
+        document.getElementById('amount').value = r.amount;
+        document.getElementById('remark').value = r.remark;
+        toggleTime();
+        document.getElementById('saveBtn').innerText = "Update Record";
+        showSection('new-entry', document.querySelectorAll('.nav-item')[1]);
+    }
+
+    function deleteRecord(i) {
+        if(confirm("Delete?")) { records.splice(i, 1); localStorage.setItem('isp_data_v4', JSON.stringify(records)); initApp(); }
+    }
+
+    function renderDB() {
+        const term = document.getElementById('search').value.toLowerCase();
+        const body = document.getElementById('dbBody');
+        body.innerHTML = records.map((r, i) => ({...r, oriIdx: i}))
+            .filter(r => r.name.toLowerCase().includes(term) || r.side.toLowerCase().includes(term) || r.invoice.toLowerCase().includes(term))
+            .reverse().map(r => `
+                <tr>
+                    <td>${r.date}</td><td>${r.side}</td><td><b>${r.name}</b></td>
+                    <td>${r.amount.toLocaleString()}</td><td>${r.payment}</td>
+                    <td class="action-btns">
+                        <button class="btn-sm btn-edit" onclick="editRecord(${r.oriIdx})" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button class="btn-sm btn-print" onclick="printReceipt(${r.oriIdx})" title="Print"><i class="fas fa-print"></i></button>
+                        <button class="btn-sm btn-del" onclick="deleteRecord(${r.oriIdx})" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`).join('');
+    }
+
+    function setChart(mode, el) {
+        chartMode = mode;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+        updateDashboard();
+    }
+
+    function updateDashboard() {
+        let cash = 0, kpay = 0, mmqr = 0;
+        const group = {};
+        records.forEach(r => {
+            if(r.payment === 'Cash') cash += r.amount;
+            else if(r.payment === 'KPay') kpay += r.amount;
+            else if(r.payment === 'MMQR') mmqr += r.amount;
+            let k = r.date;
+            if(chartMode === 'monthly') k = r.date.substring(0, 7);
+            if(chartMode === 'quarterly') k = r.date.substring(0, 4) + "-Q" + Math.ceil(parseInt(r.date.substring(5,7))/3);
+            group[k] = (group[k] || 0) + r.amount;
+        });
+
+        document.getElementById('sCash').innerText = cash.toLocaleString() + " Ks";
+        document.getElementById('sKPay').innerText = kpay.toLocaleString() + " Ks";
+        document.getElementById('sMMQR').innerText = mmqr.toLocaleString() + " Ks";
+        document.getElementById('sTotal').innerText = (cash+kpay+mmqr).toLocaleString() + " Ks";
+        document.getElementById('sUsers').innerText = records.length;
+
+        const labels = Object.keys(group).sort();
+        if(myChart) myChart.destroy();
+        myChart = new Chart(document.getElementById('mainChart'), {
+            type: 'line',
+            data: { labels, datasets: [{ label: 'Revenue (Ks)', data: labels.map(l => group[l]), borderColor: '#6366f1', tension: 0.4, fill: true, backgroundColor: 'rgba(99, 102, 241, 0.05)' }] },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    function resetForm() {
+        document.getElementById('billingForm').reset();
+        document.getElementById('editIndex').value = "-1";
+        document.getElementById('saveBtn').innerText = "Save Record";
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('invoice').value = ""; // Clear for manual entry
+        toggleTime();
+    }
+
+    let prompt;
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); prompt = e; document.getElementById('installApp').style.display = 'flex'; });
+    document.getElementById('installApp').onclick = () => { prompt.prompt(); };
+
+    function initApp() { renderDB(); updateDashboard(); }
+    window.onload = () => { initApp(); resetForm(); };
+</script>
+</body>
+</html>
